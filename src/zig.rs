@@ -579,36 +579,6 @@ impl Zig {
                 cmd.env("CARGO_UNSTABLE_TARGET_APPLIES_TO_HOST", "true");
                 cmd.env("CARGO_TARGET_APPLIES_TO_HOST", "false");
             }
-
-            // Pass options used by zig cc down to bindgen, if possible
-            if let Ok(mut options) = Self::collect_zig_cc_options(&zig_wrapper, raw_target) {
-                if raw_target.contains("apple-darwin") {
-                    // everyone seems to miss `#import <TargetConditionals.h>`...
-                    options.push("-DTARGET_OS_IPHONE=0".to_string());
-                }
-
-                let escaped_options = shlex::try_join(options.iter().map(|s| &s[..]))?;
-
-                // Override bindgen variables to append additional options
-                let bindgen_env = "BINDGEN_EXTRA_CLANG_ARGS";
-                let fallback_value = env::var(bindgen_env);
-                for target in [&env_target[..], parsed_target] {
-                    let name = format!("{bindgen_env}_{target}");
-                    if let Ok(mut value) = env::var(&name).or(fallback_value.clone()) {
-                        if shlex::split(&value).is_none() {
-                            // bindgen treats the whole string as a single argument if split fails
-                            value = shlex::try_quote(&value)?.into_owned();
-                        }
-                        if !value.is_empty() {
-                            value.push(' ');
-                        }
-                        value.push_str(&escaped_options);
-                        env::set_var(name, value);
-                    } else {
-                        env::set_var(name, escaped_options.clone());
-                    }
-                }
-            }
         }
         Ok(())
     }
